@@ -1,6 +1,7 @@
 #
+from torchvision import transforms
+from kornia import augmentation
 import torch
-import torchvision
 from models.disciminator import get_model
 import torch.nn as nn
 from torchvision.utils import save_image
@@ -64,6 +65,18 @@ class DeepInversionHook():
     def remove(self):
         self.hook.remove()
 
+class MultiTransform:
+    """Create two crops of the same image"""
+
+    def __init__(self, transform):
+        self.transform = transform
+
+    def __call__(self, x):
+        return [t(x) for t in self.transform]
+
+    def __repr__(self):
+        return str(self.transform)
+
 
 
 
@@ -76,13 +89,16 @@ if __name__ == '__main__':
     net = get_discriminator()
     net.eval()
     print(net)
-    iter = 100
+    iter = 500
     z = torch.randn(size=(100,256)).cuda()
     z.requires_grad = True
     generator = Generator()
     generator.to('cuda').train()
     reset_model(generator)    
     print(generator)
+    img_size = [1,28,28]
+
+    optimizer_G = torch.optim.Adam([{"params": generator.parameters()}, {"params": [z]}],1e-3,betas=[0.5, 0.999],)
 
     for m in net.modules():
         if isinstance(m, nn.BatchNorm2d):
@@ -90,14 +106,26 @@ if __name__ == '__main__':
 
     for i in range (iter):
         # Generate a random input
-        img = generator(z)
+        optimizer_G.zero_grad()
         if not os.path.exists('images/'):
             os.makedirs('images/')
 
-        optimizer_G = torch.optim.Adam([{"params": generator.parameters()}, {"params": [z]}],1e-3,betas=[0.5, 0.999],)
-        optimizer_G.zero_grad()
+        img = generator(z)
+        aug = MultiTransform([
+            # global view
+            transforms.Compose([
+                augmentation.RandomCrop(size=[img_size[-2], img_size[-1]], padding=4),
+                augmentation.RandomHorizontalFlip(),
+            ]),
+            # local view
+            transforms.Compose([
+                augmentation.RandomResizedCrop(size=[img_size[-2], img_size[-1]], scale=[0.25, 1.0]),
+                augmentation.RandomHorizontalFlip(),
+            ]),
+        ])
+        global_view, _ = aug(img)
 
-        t_out = net(img)
+        t_out = net(global_view)
         loss_bn = sum([h.r_feature for h in hooks])
         loss_oh = F.cross_entropy(t_out,targets)
         ##s_out=
