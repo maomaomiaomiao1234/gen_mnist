@@ -1,10 +1,8 @@
-import torch
 import torch.nn as nn
-import torch.nn.functional as F
 
 
 class Generator(nn.Module):
-    def __init__(self, nz=100, ngf=64, img_size=32, nc=3):
+    def __init__(self, nz=100, ngf=64, img_size=32, nc=1):
         super(Generator, self).__init__()
 
         self.init_size = img_size // 4
