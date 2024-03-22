@@ -2,7 +2,7 @@ import torch.nn as nn
 
 
 class Generator(nn.Module):
-    def __init__(self, nz=100, ngf=64, img_size=32, nc=1):
+    def __init__(self, nz=256, ngf=64, img_size=28, nc=1):
         super(Generator, self).__init__()
 
         self.init_size = img_size // 4

@@ -69,15 +69,15 @@ class DeepInversionHook():
 
 if __name__ == '__main__':
     # Load the generator model
-    targets = torch.randint(low=0, high=10, size=(256,))
+    targets = torch.randint(low=0, high=10, size=(100,))
     targets = targets.sort()[0]
     targets = targets.cuda()
     hooks = []
     net = get_discriminator()
     net.eval()
     print(net)
-    iter = 10
-    z = torch.randn(size=(256,100)).cuda()
+    iter = 100
+    z = torch.randn(size=(100,256)).cuda()
     z.requires_grad = True
     generator = Generator()
     generator.to('cuda').train()
@@ -93,7 +93,6 @@ if __name__ == '__main__':
         img = generator(z)
         if not os.path.exists('images/'):
             os.makedirs('images/')
-        save_image(img.data.clone(),"images/img_%d.png" % i,nrow=10,normalize= True)
 
         optimizer_G = torch.optim.Adam([{"params": generator.parameters()}, {"params": [z]}],1e-3,betas=[0.5, 0.999],)
         optimizer_G.zero_grad()
@@ -103,8 +102,11 @@ if __name__ == '__main__':
         loss_oh = F.cross_entropy(t_out,targets)
         ##s_out=
         loss = loss_bn+loss_oh
-        print("iter = {},loss_bn={},loss_oh={:.4},loss={:.4}".format(i,loss_bn,loss_oh,loss))
-        loss.backward()
+        if i % 10 == 0:
+            save_image(img.data.clone(),"images/img_%d.png" % i,nrow=10,normalize= True)
+            print("iter = {},loss_bn={},loss_oh={:.4},loss={:.4}".format(i,loss_bn,loss_oh,loss))
+        ##TODO:是否使用其他损失
+        loss_oh.backward()
         optimizer_G.step()
 
 
