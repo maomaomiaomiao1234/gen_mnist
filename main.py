@@ -45,6 +45,7 @@ def reset_model(model):
             nn.init.normal_(m.weight, 1.0, 0.02)
             nn.init.constant_(m.bias, 0)
 
+##没用到
 class DeepInversionHook():
     '''
     Implementation of the forward hook to track feature statistics and compute a loss on them.
@@ -69,6 +70,7 @@ class DeepInversionHook():
     def remove(self):
         self.hook.remove()
 
+##没用到
 class MultiTransform:
     """Create two crops of the same image"""
 
@@ -107,6 +109,20 @@ if __name__ == '__main__':
     img_size = [1,28,28]
 
     optimizer_G = torch.optim.Adam([{"params": generator.parameters()}, {"params": [z]}],1e-3,betas=[0.5, 0.999],)
+    aug = MultiTransform([
+        # global view
+        transforms.Compose([
+            augmentation.RandomCrop(size=[img_size[-2], img_size[-1]], padding=4),
+            augmentation.RandomHorizontalFlip(),
+        ]),
+        # local view
+        transforms.Compose([
+            augmentation.RandomResizedCrop(size=[img_size[-2], img_size[-1]], scale=[0.25, 1.0]),
+            augmentation.RandomHorizontalFlip(),
+        ]),
+    ])
+
+    ##MNIST不用调整，调整后生成结果更加糟糕
     aug = MultiTransform([
         # global view
         transforms.Compose([
