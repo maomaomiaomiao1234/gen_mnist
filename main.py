@@ -1,4 +1,8 @@
 #
+from pytorch_msssim import ssim
+from torchvision.datasets import MNIST
+from PIL import Image
+import torchvision.transforms as transforms
 from torchvision import transforms
 from kornia import augmentation
 import torch
@@ -10,11 +14,12 @@ import torch.nn.functional as F
 import os 
 from models.generator import Generator
 
-client_prt_path = "models_pth/ours_client_model_ac3.pth" 
-server_prt_path = "models_pth/ours_server_model_ac3.pth"
-#client_prt_path = "models_pth/SFL_client_model.pth" 
-#server_prt_path = "models_pth/SFL_server_model.pth"
-
+#client_prt_path = "models_pth/ours_client_model_ac5.pth" 
+#server_prt_path = "models_pth/ours_server_model_ac5.pth"
+client_prt_path = "models_pth/SFL_client_model.pth" 
+server_prt_path = "models_pth/SFL_server_model.pth"
+data_path = "/home/whang1234/Downloads/data/mnist"
+output = "run_separately/"
 
 class CombinedModel(nn.Module):
     def __init__(self, modelA, modelB):
@@ -92,14 +97,14 @@ if __name__ == '__main__':
     #targets = targets.sort()[0]
     #targets = targets.cuda()
     sequence = torch.tensor([0,1,2,3,4,5,6,7,8,9])
-    targets = torch.cat([sequence] * 10)
+    targets = torch.cat([sequence] * 1)
     targets = targets.cuda()
     hooks = []
     net = get_discriminator()
     net.eval()
     print(net)
     iter = 500
-    z = torch.randn(size=(100,256)).cuda()
+    z = torch.randn(size=(10,256)).cuda()
     #z = np.random.normal(0, 1, (10, 100))
     z.requires_grad = True
     generator = Generator()
@@ -159,8 +164,33 @@ if __name__ == '__main__':
         if i % 10 == 0:
             save_image(img.data.clone(),"images/img_%d.png" % i,nrow=10,normalize= True)
             print("iter = {},loss_bn={},loss_oh={:.4},loss={:.4}".format(i,loss_bn,loss_oh,loss))
+        
+        if i == iter-1:
+            if isinstance(img, torch.Tensor):
+                img = (img.detach().clamp(0, 1).cpu().numpy() * 255).astype('uint8')
+            base_dir = os.path.dirname(output)
+            if base_dir != '':
+                os.makedirs(base_dir, exist_ok=True)
+
+            output_filename = output.strip('.png')
+            for idx, img in enumerate(img):
+                if img.shape[0] == 1:
+                    img = Image.fromarray(img[0])
+                else:
+                    img = Image.fromarray(img.transpose(1, 2, 0))
+                img.save(output_filename + '-%d.png' % (idx))
+ 
         ##TODO:是否使用其他损失
         loss_oh.backward()
         optimizer_G.step()
+
+    transform = transforms.Compose([transforms.ToTensor(),
+                                    transforms.Normalize((0.5,), (0.5,))])
+    
+    dataset = MNIST(data_path, train=True, download=True, transform=transform)
+    
+    dataloader = torch.utils.data.DataLoader(dataset, batch_size=64, shuffle=True)
+    
+    real_images, real_labels = next(iter(dataloader))
 
 
