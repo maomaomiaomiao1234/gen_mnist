@@ -14,12 +14,15 @@ import torch.nn.functional as F
 import os 
 from models.generator import Generator
 
-#client_prt_path = "models_pth/ours_client_model_ac5.pth" 
-#server_prt_path = "models_pth/ours_server_model_ac5.pth"
-client_prt_path = "models_pth/SFL_client_model.pth" 
-server_prt_path = "models_pth/SFL_server_model.pth"
+from calculate_ssim import calculate_ssim
+
+client_prt_path = "models_pth/ours_client_model_ac5.pth" 
+server_prt_path = "models_pth/ours_server_model_ac5.pth"
+#client_prt_path = "models_pth/SFL_client_model.pth" 
+#server_prt_path = "models_pth/SFL_server_model.pth"
 data_path = "/home/whang1234/Downloads/data/mnist"
-output = "run_separately/"
+output = "run_separately/ac5/"
+iter = 400
 
 class CombinedModel(nn.Module):
     def __init__(self, modelA, modelB):
@@ -103,7 +106,6 @@ if __name__ == '__main__':
     net = get_discriminator()
     net.eval()
     print(net)
-    iter = 500
     z = torch.randn(size=(10,256)).cuda()
     #z = np.random.normal(0, 1, (10, 100))
     z.requires_grad = True
@@ -165,6 +167,7 @@ if __name__ == '__main__':
             save_image(img.data.clone(),"images/img_%d.png" % i,nrow=10,normalize= True)
             print("iter = {},loss_bn={},loss_oh={:.4},loss={:.4}".format(i,loss_bn,loss_oh,loss))
         
+        #保存单个图片
         if i == iter-1:
             if isinstance(img, torch.Tensor):
                 img = (img.detach().clamp(0, 1).cpu().numpy() * 255).astype('uint8')
@@ -183,14 +186,6 @@ if __name__ == '__main__':
         ##TODO:是否使用其他损失
         loss_oh.backward()
         optimizer_G.step()
-
-    transform = transforms.Compose([transforms.ToTensor(),
-                                    transforms.Normalize((0.5,), (0.5,))])
     
-    dataset = MNIST(data_path, train=True, download=True, transform=transform)
-    
-    dataloader = torch.utils.data.DataLoader(dataset, batch_size=64, shuffle=True)
-    
-    real_images, real_labels = next(iter(dataloader))
 
-
+    calculate_ssim(data_path,output)
