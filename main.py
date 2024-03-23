@@ -2,6 +2,7 @@
 from torchvision import transforms
 from kornia import augmentation
 import torch
+import numpy as np
 from models.disciminator import get_model
 import torch.nn as nn
 from torchvision.utils import save_image
@@ -11,6 +12,9 @@ from models.generator import Generator
 
 client_prt_path = "models_pth/ours_client_model_ac3.pth" 
 server_prt_path = "models_pth/ours_server_model_ac3.pth"
+#client_prt_path = "models_pth/SFL_client_model.pth" 
+#server_prt_path = "models_pth/SFL_server_model.pth"
+
 
 class CombinedModel(nn.Module):
     def __init__(self, modelA, modelB):
@@ -82,8 +86,11 @@ class MultiTransform:
 
 if __name__ == '__main__':
     # Load the generator model
-    targets = torch.randint(low=0, high=10, size=(100,))
-    targets = targets.sort()[0]
+    #targets = torch.randint(low=0, high=10, size=(100,))
+    #targets = targets.sort()[0]
+    #targets = targets.cuda()
+    sequence = torch.tensor([0,1,2,3,4,5,6,7,8,9])
+    targets = torch.cat([sequence] * 10)
     targets = targets.cuda()
     hooks = []
     net = get_discriminator()
@@ -91,6 +98,7 @@ if __name__ == '__main__':
     print(net)
     iter = 500
     z = torch.randn(size=(100,256)).cuda()
+    #z = np.random.normal(0, 1, (10, 100))
     z.requires_grad = True
     generator = Generator()
     generator.to('cuda').train()
@@ -99,6 +107,18 @@ if __name__ == '__main__':
     img_size = [1,28,28]
 
     optimizer_G = torch.optim.Adam([{"params": generator.parameters()}, {"params": [z]}],1e-3,betas=[0.5, 0.999],)
+    aug = MultiTransform([
+        # global view
+        transforms.Compose([
+            augmentation.RandomCrop(size=[img_size[-2], img_size[-1]], padding=4),
+            augmentation.RandomHorizontalFlip(),
+        ]),
+        # local view
+        transforms.Compose([
+            augmentation.RandomResizedCrop(size=[img_size[-2], img_size[-1]], scale=[0.25, 1.0]),
+            augmentation.RandomHorizontalFlip(),
+        ]),
+    ])
 
     for m in net.modules():
         if isinstance(m, nn.BatchNorm2d):
@@ -111,21 +131,11 @@ if __name__ == '__main__':
             os.makedirs('images/')
 
         img = generator(z)
-        aug = MultiTransform([
-            # global view
-            transforms.Compose([
-                augmentation.RandomCrop(size=[img_size[-2], img_size[-1]], padding=4),
-                augmentation.RandomHorizontalFlip(),
-            ]),
-            # local view
-            transforms.Compose([
-                augmentation.RandomResizedCrop(size=[img_size[-2], img_size[-1]], scale=[0.25, 1.0]),
-                augmentation.RandomHorizontalFlip(),
-            ]),
-        ])
+
         global_view, _ = aug(img)
 
-        t_out = net(global_view)
+        t_out = net(img)
+        #t_out = net(img)
         loss_bn = sum([h.r_feature for h in hooks])
         loss_oh = F.cross_entropy(t_out,targets)
         ##s_out=
